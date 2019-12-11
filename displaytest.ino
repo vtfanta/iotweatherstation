@@ -15,10 +15,11 @@
 
 #define DHTTYPE  DHT11              // Sensor type DHT11/21/22/AM2301/AM2302
 #define DHTPIN   D6           	    // Digital pin for communications
-#define DHT_SAMPLE_INTERVAL   2000  // Sample every two seconds
+#define DHT_SAMPLE_INTERVAL   15000  // Sample every two seconds
 
  //declaration
 void dht_wrapper(); // must be declared before the lib initialization
+void getWebhookData(const char * name,const char * data);
 
 // Lib instantiate
 PietteTech_DHT DHT(DHTPIN, DHTTYPE, dht_wrapper);
@@ -29,9 +30,12 @@ bool bDHTstarted;		    // flag to indicate we started acquisition
 
 Adafruit_SSD1306 display(OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
 
-char incoming;
+String forecastData;
 
 void setup() {
+    Particle.subscribe("hook-response/forecast", getWebhookData, MY_DEVICES);
+    //Particle.publish("weatherData", )
+    
     display.begin(SSD1306_SWITCHCAPVCC);
     Serial.begin(9600);
     
@@ -54,7 +58,11 @@ void loop() {
     display.setTextColor(WHITE);
     DHT.acquire();
     
+    String data = String(10);
+    Particle.publish("forecast", data, PRIVATE);
+    
     if (!DHT.acquiring()) {
+        Serial.println(forecastData);
         display.clearDisplay();
         display.display();
    
@@ -70,8 +78,24 @@ void loop() {
         
         display.println(s1);
         display.println(s2);
+        display.println("3H forecast:");
+        display.println();
+        if (forecastData.length() == 0) {
+            display.println("No data yet.");
+        } else {
+            display.println(forecastData);    
+        }
+        
         
         display.display();
         delay(DHT_SAMPLE_INTERVAL);
     }
+}
+
+void getWebhookData(const char * name,const char * data) {
+    String recData = String(data);
+    String temp = recData.substring(0, recData.indexOf('.'));
+    String hum = recData.substring(recData.lastIndexOf('.')+1);
+    forecastData = String(temp + " C, " + hum + " %");
+    Serial.println(forecastData);
 }
